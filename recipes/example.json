@@ -1,0 +1,12 @@
+{
+  "ready": "main",
+  "settle_ms": 500,
+  "steps": [
+    {
+      "action": "click",
+      "selector": "#details",
+      "wait_for": "#details-panel",
+      "checkpoint": "details"
+    }
+  ]
+}

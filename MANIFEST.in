@@ -1,0 +1,6 @@
+include README.md RELEASE.md LOCAL_DEVELOPMENT.md VALIDATION.md
+include LICENSE CHANGELOG.md CONTRIBUTING.md SECURITY.md
+include package.json package-lock.json
+recursive-include recipes *.json
+recursive-include scripts *.py
+recursive-include tests *.py *.cjs

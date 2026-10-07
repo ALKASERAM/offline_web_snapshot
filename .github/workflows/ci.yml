@@ -1,0 +1,86 @@
+name: CI
+
+permissions:
+  contents: read
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: python -m pip install 'bandit>=1.9,<2' 'pip-audit>=2.10,<3' 'ruff>=0.16,<0.17'
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: bandit -r src -q
+      - run: pip-audit . --progress-spinner off
+      - run: npm ci
+      - run: npm audit --audit-level=moderate
+
+  components:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: python -m pip install --upgrade pip build
+      - run: python -m pip install '.[cli]'
+      - run: npm ci
+      - name: Python component tests from source
+        env:
+          PYTHONPATH: src
+        run: python -m unittest discover -s tests -v
+      - run: node --test tests/runtime.test.cjs tests/css.test.cjs
+      - run: python -m build --sdist --wheel
+
+  installed-wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: python -m pip install --upgrade pip build
+      - run: python -m pip install '.[cli]'
+      - run: npm ci
+      - run: python -m playwright install --with-deps chromium firefox
+      # GitHub's hosted Ubuntu runner blocks Chromium's Linux sandbox. This gate
+      # uses only controlled loopback fixtures and separately records the opt-out.
+      - name: Installed-wheel browser acceptance
+        env:
+          OFFLINE_SNAPSHOT_ALLOW_UNSANDBOXED_CHROMIUM: '1'
+        run: python scripts/release_check.py --browser --phase ci-${{ github.run_id }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-check
+          path: |
+            outputs/release-check-dist/
+            reports/release-check.json
+            reports/cli-release/

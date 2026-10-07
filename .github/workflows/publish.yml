@@ -1,0 +1,55 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: startsWith(github.event.release.tag_name, 'v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install '.[dev]'
+      - run: npm ci
+      - name: Verify tag and package version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: python -c "import offline_snapshot, os; assert os.environ['RELEASE_TAG'] == 'v' + offline_snapshot.__version__"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: python scripts/release_check.py --dist-dir dist --report reports/publish-check.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/offline-snapshot/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

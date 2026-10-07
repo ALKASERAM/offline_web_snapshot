@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "description": "Build-only JavaScript parsing for portable HTML captures",
+  "dependencies": {
+    "esbuild": "0.28.2",
+    "es-module-lexer": "3.0.2"
+  }
+}
