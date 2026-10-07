@@ -29,6 +29,10 @@ python3 -m venv .venv
 .venv/bin/offline-snapshot doctor
 ```
 
+Do not start a capture until `doctor` reports `passed` for at least one browser.
+If only Firefox passes, use the Firefox-only command in
+[Troubleshooting browser startup](#troubleshooting-browser-startup).
+
 For development from a checkout, see
 [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md).
 
@@ -65,6 +69,42 @@ Exit codes are:
 An exit code of zero from `pack`, `capture`, or `save --no-validate` is not an
 offline browser acceptance result. The JSON status explicitly says when an
 artifact was not validated.
+
+## Troubleshooting browser startup
+
+### `Chromium sandboxing failed` on Linux
+
+On Ubuntu 23.10 or newer, AppArmor can prevent Playwright's downloaded Chromium
+from creating its sandbox. The error contains `No usable sandbox` or
+`Chromium sandboxing failed`. This happens before capture, so `save` does not
+write the capture archive or HTML file. It still writes
+`reports/<name>/result.json` with the failure details.
+
+The safe immediate fallback is to capture and validate with Firefox:
+
+```sh
+.venv/bin/offline-snapshot doctor --browsers firefox
+
+.venv/bin/offline-snapshot save 'https://example.com/' \
+  --browser firefox \
+  --validation-browsers firefox \
+  --depth 1 \
+  --max-pages 25 \
+  --output outputs/site.html \
+  --report-dir reports/site \
+  --overwrite
+```
+
+`--overwrite` is needed when retrying the same paths because the failed attempt
+may already have written `result.json`. Firefox-only validation establishes
+Firefox compatibility; it is not evidence that Chromium replay passed.
+
+If Chromium is required, configure a path-specific AppArmor profile or another
+supported Chromium sandbox for the Playwright browser executable. Follow the
+[Chromium AppArmor guidance](https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md).
+Do not globally disable the operating-system restriction, and do not use
+`OFFLINE_SNAPSHOT_ALLOW_UNSANDBOXED_CHROMIUM=1` to capture public or untrusted
+websites. That override is reserved for controlled, trusted test fixtures.
 
 ## Capture scope
 
